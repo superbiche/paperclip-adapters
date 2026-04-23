@@ -1,0 +1,26 @@
+{
+  "name": "@superbiche/paperclip-adapters",
+  "version": "0.0.0",
+  "private": true,
+  "description": "External adapter pack for paperclipai/paperclip — cline, qwen, and more.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/superbiche/paperclip-adapters"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "clean": "pnpm -r clean",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.0",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

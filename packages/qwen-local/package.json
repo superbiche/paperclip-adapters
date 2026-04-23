@@ -1,0 +1,36 @@
+{
+  "name": "@superbiche/qwen-paperclip-adapter",
+  "version": "0.1.0",
+  "description": "Paperclip external adapter that spawns the Qwen Code CLI as a managed employee.",
+  "type": "module",
+  "license": "MIT",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/superbiche/paperclip-adapters",
+    "directory": "packages/qwen-local"
+  },
+  "paperclip": {
+    "adapterUiParser": "1.0.0"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./server": "./dist/server/index.js",
+    "./ui-parser": "./dist/ui-parser.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@paperclipai/adapter-utils": "^2026.416.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
