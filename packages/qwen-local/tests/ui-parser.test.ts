@@ -43,6 +43,35 @@ describe("parseStdoutLine (qwen-local)", () => {
     ]);
   });
 
+  it("unwraps thinking blocks that carry content on the `thinking` key (qwen 0.14+)", () => {
+    const entries = parseStdoutLine(
+      JSON.stringify({
+        type: "assistant",
+        message: {
+          content: [
+            { type: "thinking", thinking: "deliberating on next step" },
+            { type: "output_text", text: "ok" },
+          ],
+        },
+      }),
+      TS,
+    );
+    expect(entries).toEqual([
+      { kind: "thinking", ts: TS, text: "deliberating on next step" },
+      { kind: "assistant", ts: TS, text: "ok" },
+    ]);
+  });
+
+  it("unwraps top-level thinking event that carries content on the `thinking` key", () => {
+    const entries = parseStdoutLine(
+      JSON.stringify({ type: "thinking", thinking: "top-level deliberation" }),
+      TS,
+    );
+    expect(entries).toEqual([
+      { kind: "thinking", ts: TS, text: "top-level deliberation" },
+    ]);
+  });
+
   it("emits result entries with usage totals", () => {
     const entries = parseStdoutLine(
       JSON.stringify({

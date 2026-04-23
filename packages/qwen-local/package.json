@@ -1,9 +1,26 @@
 {
   "name": "@superbiche/qwen-paperclip-adapter",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Paperclip external adapter that spawns the Qwen Code CLI as a managed employee. Originally authored by @oshliaer (paperclipai/paperclip#1490), ported to external-plugin shape by @superbiche.",
   "type": "module",
   "license": "MIT",
+  "homepage": "https://github.com/superbiche/paperclip-adapters/tree/main/packages/qwen-local#readme",
+  "bugs": {
+    "url": "https://github.com/superbiche/paperclip-adapters/issues"
+  },
+  "keywords": [
+    "paperclip",
+    "paperclipai",
+    "adapter",
+    "qwen",
+    "qwen-code",
+    "dashscope",
+    "agent",
+    "ai",
+    "coding-agent",
+    "llm",
+    "orchestration"
+  ],
   "author": "Alex Ivanov <oshli.a.er@gmail.com> (https://github.com/oshliaer)",
   "contributors": [
     "Michel Tomas <michel@tsbwc.com> (https://github.com/superbiche)"

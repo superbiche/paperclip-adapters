@@ -439,8 +439,6 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
       sessionId: resolvedSessionId,
       sessionParams: resolvedSessionParams,
       sessionDisplayId: resolvedSessionId,
-      provider: "dashscope",
-      biller: "alibaba",
       model,
       billingType,
       costUsd: attempt.parsed.costUsd,

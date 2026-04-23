@@ -1,9 +1,24 @@
 {
   "name": "@superbiche/cline-paperclip-adapter",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Paperclip external adapter that spawns Cline CLI 2.x as a managed employee.",
   "type": "module",
   "license": "MIT",
+  "homepage": "https://github.com/superbiche/paperclip-adapters/tree/main/packages/cline-local#readme",
+  "bugs": {
+    "url": "https://github.com/superbiche/paperclip-adapters/issues"
+  },
+  "keywords": [
+    "paperclip",
+    "paperclipai",
+    "adapter",
+    "cline",
+    "agent",
+    "ai",
+    "coding-agent",
+    "llm",
+    "orchestration"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/superbiche/paperclip-adapters",

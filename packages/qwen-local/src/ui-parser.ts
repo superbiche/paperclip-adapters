@@ -131,7 +131,7 @@ function parseAssistantMessage(messageRaw: unknown, ts: string): TranscriptEntry
     }
 
     if (type === "thinking") {
-      const text = asString(part.text).trim();
+      const text = asString(part.thinking).trim() || asString(part.text).trim();
       if (text) entries.push({ kind: "thinking", ts, text });
       continue;
     }
@@ -282,7 +282,10 @@ function parseLine(line: string, ts: string): TranscriptEntry[] {
 
   if (type === "thinking") {
     const text =
-      asString(parsed.text).trim() || asString(asRecord(parsed.delta)?.text).trim();
+      asString(parsed.thinking).trim() ||
+      asString(parsed.text).trim() ||
+      asString(asRecord(parsed.delta)?.thinking).trim() ||
+      asString(asRecord(parsed.delta)?.text).trim();
     return text ? [{ kind: "thinking", ts, text }] : [];
   }
 
