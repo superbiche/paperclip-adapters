@@ -17,29 +17,27 @@ When a new gap surfaces, categorise as:
 
 ## Active
 
-### External adapters cannot declare `sessionManagement` — init-time IIFE path
-
-**Gap:** `server/src/adapters/registry.ts:363-369` overwrote any module-provided `sessionManagement` field with `getAdapterSessionManagement(type) ?? undefined`. The hardcoded registry at `packages/adapter-utils/src/session-compaction.ts:49-85` is keyed by builtin type strings only, so external adapters always resolved to `undefined`. `supportsSessionResume`, `nativeContextManagement`, and `defaultSessionCompaction` were therefore unsettable for external adapters, and the runtime's compaction policy paths (which gate on those flags) were disabled — even when the external adapter provided a working `sessionCodec`.
-
-**Fix (submitted):** honor module-provided `sessionManagement` when non-null, falling back to the registry lookup. Extracted as `resolveExternalAdapterRegistration`; IIFE delegates to it. Plus unit tests.
-
-**Context:** PR [#2218](https://github.com/paperclipai/paperclip/pull/2218) (the foundational external-adapter plugin system) explicitly deferred this: *"Adapter execution model, heartbeat protocol, and session management are untouched."* The current fix is the natural follow-up.
-
-**Branch:** `fix/external-session-management` on `superbiche/paperclip`.
-
-**PR:** [paperclipai/paperclip#4296](https://github.com/paperclipai/paperclip/pull/4296) — ready-for-review.
-
 ### External adapters cannot declare `sessionManagement` — hot-install path (parity follow-up to #4296)
 
-**Gap:** even with #4296 merged, the hot-install path at `server/src/routes/adapters.ts:174 registerWithSessionManagement` still unconditionally overwrote module `sessionManagement` with the registry lookup. Practical impact: an adapter installed via `POST /api/adapters/install` needed a Paperclip restart before its declared `sessionManagement` became effective (the IIFE path runs on next boot).
+**Gap:** with #4296 merged the init-time IIFE preserves module-provided `sessionManagement`, but the hot-install path at `server/src/routes/adapters.ts:174 registerWithSessionManagement` still unconditionally overwrites it with the registry lookup. Practical impact: an adapter installed via `POST /api/adapters/install` needs a Paperclip restart before its declared `sessionManagement` becomes effective (the IIFE runs on next boot and preserves it, but until then the hot-install overwrite wins).
 
-**Fix (drafted locally, hold-push pattern):** delegate `registerWithSessionManagement` to the same `resolveExternalAdapterRegistration` helper introduced by #4296. Unifies the init-time IIFE and hot-install paths behind one resolver. Plus one integration test in `server/src/__tests__/adapter-routes.test.ts` that installs an external module carrying a non-trivial `sessionManagement` declaration and asserts the registered module preserves it after `POST /api/adapters/install` returns 201.
+**Fix:** delegate `registerWithSessionManagement` to the same `resolveExternalAdapterRegistration` helper introduced by #4296. Unifies the init-time IIFE and hot-install paths behind one resolver. Plus one integration test in `server/src/__tests__/adapter-routes.test.ts` that installs an external module carrying a non-trivial `sessionManagement` declaration and asserts the registered module preserves it after `POST /api/adapters/install` returns 201.
 
 **Local verification:** `pnpm -w run test` — 1923/1924 passed (1 skipped, unrelated).
 
-**Branch:** `fix/external-session-management-hot-install` on `superbiche/paperclip`. Stacked on `fix/external-session-management`; should merge after #4296 lands.
+**Branch:** `fix/external-session-management-hot-install` on `superbiche/paperclip`, now rebased onto `upstream/master` as a clean single-commit follow-up.
 
-**PR:** [paperclipai/paperclip#4324](https://github.com/paperclipai/paperclip/pull/4324) — ready-for-review, explicitly stacked on #4296.
+**PR:** [paperclipai/paperclip#4324](https://github.com/paperclipai/paperclip/pull/4324) — ready-for-review.
+
+---
+
+## Landed upstream
+
+### External adapters cannot declare `sessionManagement` — init-time IIFE path (merged)
+
+**Fix landed:** [paperclipai/paperclip#4296](https://github.com/paperclipai/paperclip/pull/4296) merged 2026-04-23 as commit `24232078fd64575a31713428c3df13e57dd66f38`. Exported `resolveExternalAdapterRegistration` helper honors module-provided `sessionManagement` first, falls back to `getAdapterSessionManagement(type)`, else `undefined`. The init-time IIFE delegates to the helper. Plus three unit tests covering module-provided / registry-fallback / undefined paths.
+
+**Context:** PR [#2218](https://github.com/paperclipai/paperclip/pull/2218) (the foundational external-adapter plugin system) explicitly deferred this: *"Adapter execution model, heartbeat protocol, and session management are untouched."* #4296 closed the gap on the cold-start path; the hot-install follow-up above closes it on the `POST /api/adapters/install` path.
 
 ---
 
