@@ -39,7 +39,7 @@ When a new gap surfaces, categorise as:
 
 **Branch:** `fix/external-session-management-hot-install` on `superbiche/paperclip`. Stacked on `fix/external-session-management`; should merge after #4296 lands.
 
-**PR:** not yet opened. Push when #4296 has maintainer review or lands.
+**PR:** [paperclipai/paperclip#4324](https://github.com/paperclipai/paperclip/pull/4324) — ready-for-review, explicitly stacked on #4296.
 
 ---
 
