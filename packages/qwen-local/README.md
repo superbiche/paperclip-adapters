@@ -12,22 +12,27 @@ The external-plugin port — `src/server/index.ts` factory exposing `createServe
 
 ## Status
 
-- Version 0.1.0 — private, not yet on npm. Install via `POST /api/adapters/install` with `isLocalPath: true` from a clone of [`superbiche/paperclip-adapters`](https://github.com/superbiche/paperclip-adapters).
+- v0.1.0 on npm as [`@superbiche/qwen-paperclip-adapter`](https://www.npmjs.com/package/@superbiche/qwen-paperclip-adapter).
 - Session resume (`qwen -r <id>`) proven: after two consecutive heartbeats, Paperclip persists the Qwen session in `agent_task_sessions` and the adapter reuses it. Qwen's own `usage.sessionReused: true` confirms the resume.
 - `supportsSessionResume: true`, `nativeContextManagement: "confirmed"`. Requires [paperclipai/paperclip#4296](https://github.com/paperclipai/paperclip/pull/4296) for `sessionManagement` to survive hot-install without a Paperclip restart; today the IIFE path (post-restart) preserves it.
 
-## Quickstart (local)
+## Install
 
 ```bash
-# Build
-pnpm -C packages/qwen-local build
-
-# Install into a running Paperclip instance
 curl -X POST http://127.0.0.1:3100/api/adapters/install \
   -H 'content-type: application/json' \
-  -d '{"packageName":"/absolute/path/to/packages/qwen-local","isLocalPath":true}'
+  -d '{"packageName":"@superbiche/qwen-paperclip-adapter"}'
+```
 
-# Restart Paperclip so the IIFE picks up sessionManagement
+Restart Paperclip once after install so the IIFE path picks up `sessionManagement` (tracked as a parity-fix follow-up to paperclipai/paperclip#4296).
+
+## Local development
+
+```bash
+git clone https://github.com/superbiche/paperclip-adapters
+cd paperclip-adapters
+pnpm install
+pnpm -C packages/qwen-local build
 ```
 
 ## Agent config
