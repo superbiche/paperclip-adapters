@@ -12,9 +12,9 @@ The external-plugin port — `src/server/index.ts` factory exposing `createServe
 
 ## Status
 
-- v0.1.0 on npm as [`@superbiche/qwen-paperclip-adapter`](https://www.npmjs.com/package/@superbiche/qwen-paperclip-adapter).
+- v0.1.2 on npm as [`@superbiche/qwen-paperclip-adapter`](https://www.npmjs.com/package/@superbiche/qwen-paperclip-adapter).
 - Session resume (`qwen -r <id>`) proven: after two consecutive heartbeats, Paperclip persists the Qwen session in `agent_task_sessions` and the adapter reuses it. Qwen's own `usage.sessionReused: true` confirms the resume.
-- `supportsSessionResume: true`, `nativeContextManagement: "confirmed"`. Requires [paperclipai/paperclip#4296](https://github.com/paperclipai/paperclip/pull/4296) for `sessionManagement` to survive hot-install without a Paperclip restart; today the IIFE path (post-restart) preserves it.
+- `supportsSessionResume: true`, `nativeContextManagement: "confirmed"`. Full session-management parity landed via [paperclipai/paperclip#4296](https://github.com/paperclipai/paperclip/pull/4296) (IIFE path) and [#4324](https://github.com/paperclipai/paperclip/pull/4324) (hot-install path); both are in master and ship in `canary/v2026.423.0-canary.2` and the next stable tag.
 
 ## Install
 
@@ -24,7 +24,7 @@ curl -X POST http://127.0.0.1:3100/api/adapters/install \
   -d '{"packageName":"@superbiche/qwen-paperclip-adapter"}'
 ```
 
-Restart Paperclip once after install so the IIFE path picks up `sessionManagement` (tracked as a parity-fix follow-up to paperclipai/paperclip#4296).
+On paperclip built from master commit `3d15798` or later (i.e. `canary/v2026.423.0-canary.2` or the next stable), hot-install picks up `sessionManagement` without a restart. On older releases (`v2026.416.0` and prior, pre-#4324), restart Paperclip once after install so the IIFE path can register it.
 
 ## Local development
 

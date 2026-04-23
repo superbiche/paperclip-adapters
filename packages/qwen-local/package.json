@@ -1,6 +1,6 @@
 {
   "name": "@superbiche/qwen-paperclip-adapter",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Paperclip external adapter that spawns the Qwen Code CLI as a managed employee. Originally authored by @oshliaer (paperclipai/paperclip#1490), ported to external-plugin shape by @superbiche.",
   "type": "module",
   "license": "MIT",

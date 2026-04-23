@@ -1,6 +1,6 @@
 {
   "name": "@superbiche/cline-paperclip-adapter",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Paperclip external adapter that spawns Cline CLI 2.x as a managed employee.",
   "type": "module",
   "license": "MIT",

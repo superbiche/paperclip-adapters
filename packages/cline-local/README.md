@@ -4,11 +4,11 @@ External [Paperclip](https://github.com/paperclipai/paperclip) adapter that spaw
 
 ## Status
 
-- v0.1.0 on npm as [`@superbiche/cline-paperclip-adapter`](https://www.npmjs.com/package/@superbiche/cline-paperclip-adapter).
+- v0.1.2 on npm as [`@superbiche/cline-paperclip-adapter`](https://www.npmjs.com/package/@superbiche/cline-paperclip-adapter).
 - Session resume (`cline -T <id>`) proven: 9 consecutive 30-second-interval heartbeats against the same issue all resumed the same Cline task.
 - Watchdog kills the run on hang-prone asks (`followup`, `mistake_limit_reached`, `plan_mode_respond`, `act_mode_respond`) with a structured `cline_hang_prone_ask_<subtype>` error code.
 - Event discriminator and token aggregation verified against Cline's own aggregator in `dist/cli.mjs`.
-- `supportsSessionResume: true`, `nativeContextManagement: "confirmed"`. Requires [paperclipai/paperclip#4296](https://github.com/paperclipai/paperclip/pull/4296) for `sessionManagement` to survive hot-install without a Paperclip restart; today the IIFE path (post-restart) preserves it.
+- `supportsSessionResume: true`, `nativeContextManagement: "confirmed"`. Full session-management parity landed via [paperclipai/paperclip#4296](https://github.com/paperclipai/paperclip/pull/4296) (IIFE path) and [#4324](https://github.com/paperclipai/paperclip/pull/4324) (hot-install path); both are in master and ship in `canary/v2026.423.0-canary.2` and the next stable tag.
 
 ## Install
 
@@ -18,7 +18,7 @@ curl -X POST http://127.0.0.1:3100/api/adapters/install \
   -d '{"packageName":"@superbiche/cline-paperclip-adapter"}'
 ```
 
-Restart Paperclip once after install so the IIFE path picks up `sessionManagement` (tracked as a parity-fix follow-up to paperclipai/paperclip#4296).
+On paperclip built from master commit `3d15798` or later (i.e. `canary/v2026.423.0-canary.2` or the next stable), hot-install picks up `sessionManagement` without a restart. On older releases (`v2026.416.0` and prior, pre-#4324), restart Paperclip once after install so the IIFE path can register it.
 
 ## Local development
 
