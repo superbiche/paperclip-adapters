@@ -2,6 +2,7 @@
   "name": "@superbiche/paperclip-adapters",
   "version": "0.0.0",
   "private": true,
+  "packageManager": "pnpm@10.16.1",
   "description": "External adapter pack for paperclipai/paperclip — cline, qwen, and more.",
   "type": "module",
   "license": "MIT",
