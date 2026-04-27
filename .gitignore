@@ -3,3 +3,7 @@ dist/
 *.tsbuildinfo
 *.log
 .DS_Store
+
+# Local Claude Code context (private, never committed)
+CLAUDE.local.md
+.claude/settings.local.json
