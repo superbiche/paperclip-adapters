@@ -40,7 +40,7 @@ Create a Paperclip agent with `adapterType: "cline_local"` and an `adapterConfig
   "adapterConfig": {
     "command": "cline",
     "configDir": "/absolute/path/to/preauth/cline-config",
-    "model": "deepseek-chat",
+    "model": "deepseek-v4-pro",
     "timeoutSec": 600
   }
 }
@@ -49,7 +49,7 @@ Create a Paperclip agent with `adapterType: "cline_local"` and an `adapterConfig
 `configDir` must be a pre-authenticated Cline config directory. Seed once:
 
 ```bash
-cline auth -p deepseek -k "$DEEPSEEK_API_KEY" -m deepseek-chat \
+cline auth -p deepseek -k "$DEEPSEEK_API_KEY" -m deepseek-v4-pro \
   --config /absolute/path/to/preauth/cline-config
 ```
 

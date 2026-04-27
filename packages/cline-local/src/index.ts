@@ -2,8 +2,8 @@ export const type = "cline_local";
 export const label = "Cline (local)";
 
 export const models: { id: string; label: string }[] = [
-  { id: "deepseek-chat", label: "deepseek-chat" },
-  { id: "deepseek-reasoner", label: "deepseek-reasoner" },
+  { id: "deepseek-v4-pro", label: "deepseek-v4-pro" },
+  { id: "deepseek-v4-flash", label: "deepseek-v4-flash" },
   { id: "anthropic/claude-sonnet-4-6", label: "claude-sonnet-4-6" },
   { id: "anthropic/claude-opus-4-7", label: "claude-opus-4-7" },
   { id: "anthropic/claude-haiku-4-5", label: "claude-haiku-4-5" },
@@ -26,7 +26,7 @@ Don't use when:
 Core fields:
 - command (string, optional): defaults to \`cline\`
 - configDir (string, required): path to pre-authenticated Cline \`--config\` directory. Seed via \`cline auth -p <provider> -k <key> -m <model> --config <dir>\` once.
-- model (string, optional): model id passed as \`-m\` (e.g. \`deepseek-chat\`)
+- model (string, optional): model id passed as \`-m\` (e.g. \`deepseek-v4-pro\`)
 - cwd (string, optional): absolute working directory fallback when paperclipWorkspace is not provided
 - instructionsFilePath (string, optional): absolute path to a markdown instructions file prepended to the prompt
 - promptTemplate (string, optional): heartbeat prompt template
