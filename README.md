@@ -9,9 +9,10 @@ Each adapter ships as its own npm package under `@superbiche/*`. They plug into 
 | Package | Wraps | Version |
 |---|---|---|
 | [`@superbiche/cline-paperclip-adapter`](./packages/cline-local) | [Cline CLI 2.x](https://github.com/cline/cline) | [![npm](https://img.shields.io/npm/v/@superbiche/cline-paperclip-adapter.svg)](https://www.npmjs.com/package/@superbiche/cline-paperclip-adapter) |
+| [`@superbiche/copilot-paperclip-adapter`](./packages/copilot-local) | [GitHub Copilot CLI](https://docs.github.com/copilot/how-tos/copilot-cli) | [![npm](https://img.shields.io/npm/v/@superbiche/copilot-paperclip-adapter.svg)](https://www.npmjs.com/package/@superbiche/copilot-paperclip-adapter) |
 | [`@superbiche/qwen-paperclip-adapter`](./packages/qwen-local) | [Qwen Code CLI](https://github.com/QwenLM/qwen-code) | [![npm](https://img.shields.io/npm/v/@superbiche/qwen-paperclip-adapter.svg)](https://www.npmjs.com/package/@superbiche/qwen-paperclip-adapter) |
 
-Both adapters declare `sessionManagement` with `supportsSessionResume: true`. Their CLI-native session handles (`cline -T <taskId>`, `qwen -r <sessionId>`) round-trip through Paperclip's `agent_task_sessions` table and resume across heartbeats.
+Every adapter declares `sessionManagement` with `supportsSessionResume: true`. Their CLI-native session handles (`cline -T <taskId>`, `copilot --resume=<sessionId>`, `qwen -r <sessionId>`) round-trip through Paperclip's `agent_task_sessions` table and resume across heartbeats.
 
 ## Quickstart
 
