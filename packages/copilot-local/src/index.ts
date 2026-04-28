@@ -42,15 +42,21 @@ Core fields:
 - promptTemplate (string, optional): heartbeat prompt template
 - dangerouslySkipPermissions (boolean, optional): pass \`--allow-all\` instead of \`--allow-all-tools\`
 - extraArgs (string[], optional): additional CLI args
-- env (object, optional): KEY=VALUE environment variables (e.g. \`GH_TOKEN\` to inject a personal access token)
+- env (object, optional): KEY=VALUE environment variables (legacy / overrides — \`copilotToken\` is preferred over inline \`GH_TOKEN\`)
 - timeoutSec (number, optional): adapter-level timeout in seconds (0 = no timeout)
 - graceSec (number, optional): SIGTERM grace period before SIGKILL (default 20)
+
+Auth fields:
+- copilotToken (string, optional, secret): BYOK fine-grained PAT (\`github_pat_\`) or OAuth token (\`gho_\`/\`ghu_\`). Classic PATs (\`ghp_\`) are rejected. Injected into the spawn env as \`GH_TOKEN\`.
+- gheHost (string, optional): GitHub Enterprise hostname (e.g. \`corp.ghe.com\`). Strict format validation: bare DNS only — no URLs, schemes, ports, paths, or userinfo. When set, \`gh auth token --hostname <host>\` is used and env-var token fallback is suppressed (SSRF guard).
+- tokenSource (string, optional): \`auto\` (default — env first, then \`gh auth token\` CLI), \`env\` (env vars only, no CLI fallback), \`gh_cli\` (skip env, go straight to CLI).
 
 Notes:
 - Paperclip runs Copilot via \`copilot -p <prompt> --output-format json -s --no-color [--resume=<id>] [--allow-all|--allow-all-tools] [--model <id>] [--effort <level>]\`.
 - If a saved sessionId exists for the same cwd, Paperclip resumes it. Otherwise a fresh session is started.
 - Copilot CLI errors land in stderr as plain text (zero JSONL on stdout); the adapter detects "no session or task matched" and retries fresh.
-- Auth: the adapter does not inject tokens by default. Either run \`copilot login\` once on the host, or set \`GH_TOKEN\`/\`GITHUB_TOKEN\` via the \`env\` config.
+- Auth resolution chain when no \`copilotToken\` is set: \`COPILOT_GITHUB_TOKEN\` → \`GH_TOKEN\` → \`GITHUB_TOKEN\` → \`gh auth token\` CLI. Falls back to whatever \`~/.copilot/\` auth state exists on the host.
+- Token source is surfaced via \`onMeta.context.copilotTokenSource\` for diagnostics. The token itself is never logged.
 `;
 
 export { createServerAdapter } from "./server/index.js";

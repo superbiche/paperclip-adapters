@@ -4,6 +4,16 @@ function readNonEmptyString(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 }
 
+/**
+ * Session codec for copilot_local.
+ *
+ * Persists the Copilot CLI's native sessionId across runs, plus optional
+ * workspace context (cwd, workspaceId, repoUrl, repoRef) that lets the
+ * heartbeat decide whether resuming the saved session is sound for the
+ * current workspace shape. The non-essential context fields are
+ * round-tripped verbatim — they don't drive resume eligibility on their
+ * own; that decision lives in `execute.ts`.
+ */
 export const sessionCodec: AdapterSessionCodec = {
   deserialize(raw: unknown) {
     if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return null;
@@ -14,9 +24,16 @@ export const sessionCodec: AdapterSessionCodec = {
       readNonEmptyString(record.cwd) ??
       readNonEmptyString(record.workdir) ??
       readNonEmptyString(record.folder);
+    const workspaceId =
+      readNonEmptyString(record.workspaceId) ?? readNonEmptyString(record.workspace_id);
+    const repoUrl = readNonEmptyString(record.repoUrl) ?? readNonEmptyString(record.repo_url);
+    const repoRef = readNonEmptyString(record.repoRef) ?? readNonEmptyString(record.repo_ref);
     return {
       sessionId,
       ...(cwd ? { cwd } : {}),
+      ...(workspaceId ? { workspaceId } : {}),
+      ...(repoUrl ? { repoUrl } : {}),
+      ...(repoRef ? { repoRef } : {}),
     };
   },
   serialize(params: Record<string, unknown> | null) {
@@ -27,9 +44,16 @@ export const sessionCodec: AdapterSessionCodec = {
       readNonEmptyString(params.cwd) ??
       readNonEmptyString(params.workdir) ??
       readNonEmptyString(params.folder);
+    const workspaceId =
+      readNonEmptyString(params.workspaceId) ?? readNonEmptyString(params.workspace_id);
+    const repoUrl = readNonEmptyString(params.repoUrl) ?? readNonEmptyString(params.repo_url);
+    const repoRef = readNonEmptyString(params.repoRef) ?? readNonEmptyString(params.repo_ref);
     return {
       sessionId,
       ...(cwd ? { cwd } : {}),
+      ...(workspaceId ? { workspaceId } : {}),
+      ...(repoUrl ? { repoUrl } : {}),
+      ...(repoRef ? { repoRef } : {}),
     };
   },
   getDisplayId(params: Record<string, unknown> | null) {

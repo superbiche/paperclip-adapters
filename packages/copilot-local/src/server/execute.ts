@@ -22,6 +22,8 @@ import {
   detectCopilotAuthRequired,
   isCopilotUnknownSessionError,
 } from "./parse.js";
+import { resolveCopilotToken, validateCopilotToken } from "./auth.js";
+import { isValidGheHost } from "./models.js";
 
 interface CopilotRuntimeConfig {
   command: string;
@@ -30,6 +32,12 @@ interface CopilotRuntimeConfig {
   timeoutSec: number;
   graceSec: number;
   extraArgs: string[];
+  /**
+   * Where the Copilot auth token came from on this run, or `null` when no
+   * token was resolved (the host's `~/.copilot/` state is the only auth path).
+   * Surfaced via `onMeta` for diagnostics; never logged in plaintext.
+   */
+  tokenSource: string | null;
 }
 
 async function buildCopilotRuntimeConfig(input: {
@@ -55,6 +63,38 @@ async function buildCopilotRuntimeConfig(input: {
     if (typeof value === "string") env[key] = value;
   }
 
+  // Auth resolution: BYOK token (config.copilotToken) > env (config.env or
+  // process.env) > `gh auth token` CLI fallback. The resolved token is
+  // injected into the spawn env as GH_TOKEN so Copilot CLI picks it up.
+  // Malformed gheHost values are rejected up front (defense-in-depth on top
+  // of the env-token gate in models.ts).
+  const rawGheHost = config.gheHost;
+  const gheHost =
+    rawGheHost !== undefined && rawGheHost !== null && rawGheHost !== ""
+      ? (isValidGheHost(rawGheHost) ? (rawGheHost as string).trim() : undefined)
+      : undefined;
+  const tokenSourceHint = asString(config.tokenSource, "auto");
+
+  let tokenSource: string | null = null;
+  const explicitToken = asString(config.copilotToken, "").trim();
+  if (explicitToken) {
+    const validation = validateCopilotToken(explicitToken);
+    if (validation.valid) {
+      env.GH_TOKEN = explicitToken;
+      tokenSource = "config:copilotToken";
+    }
+  }
+
+  if (!tokenSource) {
+    // Merge process.env + adapter env so resolveCopilotToken sees both.
+    const searchEnv: Record<string, string | undefined> = { ...process.env, ...env };
+    const resolved = await resolveCopilotToken(searchEnv, gheHost, tokenSourceHint);
+    if (resolved) {
+      env.GH_TOKEN = resolved.token;
+      tokenSource = resolved.source;
+    }
+  }
+
   const runtimeEnv = ensurePathInEnv({ ...process.env, ...env });
   await ensureCommandResolvable(command, cwd, runtimeEnv);
 
@@ -66,7 +106,7 @@ async function buildCopilotRuntimeConfig(input: {
     return asStringArray(config.args);
   })();
 
-  return { command, cwd, env, timeoutSec, graceSec, extraArgs };
+  return { command, cwd, env, timeoutSec, graceSec, extraArgs, tokenSource };
 }
 
 export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExecutionResult> {
@@ -86,7 +126,7 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
     config,
     context,
   });
-  const { command, cwd, env, timeoutSec, graceSec, extraArgs } = runtimeConfig;
+  const { command, cwd, env, timeoutSec, graceSec, extraArgs, tokenSource } = runtimeConfig;
 
   const runtimeSessionParams = parseObject(runtime.sessionParams);
   const runtimeSessionId = asString(runtimeSessionParams.sessionId, runtime.sessionId ?? "");
@@ -137,7 +177,11 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
         commandArgs: args,
         env: redactEnvForLogs(env),
         prompt,
-        context,
+        context: {
+          ...context,
+          // Surface where the auth token came from (or null) — never the token itself.
+          copilotTokenSource: tokenSource,
+        },
       });
     }
 

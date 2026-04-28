@@ -15,6 +15,9 @@ import {
 } from "@paperclipai/adapter-utils/server-utils";
 import path from "node:path";
 import { parseCopilotJsonl, detectCopilotAuthRequired } from "./parse.js";
+import { resolveCopilotToken } from "./auth.js";
+import { isValidGheHost } from "./models.js";
+import { detectCopilotLocalModel } from "./detect-model.js";
 
 function summarizeStatus(checks: AdapterEnvironmentCheck[]): AdapterEnvironmentTestResult["status"] {
   if (checks.some((check) => check.level === "error")) return "fail";
@@ -91,8 +94,76 @@ export async function testEnvironment(
     });
   }
 
+  // gheHost validation (defense-in-depth — same validator as listModels uses).
+  const rawGheHost = config.gheHost;
+  if (rawGheHost !== undefined && rawGheHost !== null && rawGheHost !== "") {
+    if (isValidGheHost(rawGheHost)) {
+      checks.push({
+        code: "copilot_ghehost_valid",
+        level: "info",
+        message: `GitHub Enterprise host: ${(rawGheHost as string).trim()}`,
+      });
+    } else {
+      checks.push({
+        code: "copilot_ghehost_invalid",
+        level: "error",
+        message: "Configured `gheHost` is not a valid hostname.",
+        detail: typeof rawGheHost === "string" ? rawGheHost : String(rawGheHost),
+        hint: "Use a bare DNS hostname (e.g. `corp.ghe.com`). URLs, schemes, ports, paths, and userinfo are not allowed.",
+      });
+    }
+  }
+
+  // Token resolution probe — surfaces which credential source is active for
+  // this agent's runtime. Never logs the token itself.
+  const explicitToken = asString(config.copilotToken, "").trim();
+  const tokenSourceHint = asString(config.tokenSource, "auto");
+  const validatedGheHost =
+    rawGheHost !== undefined && rawGheHost !== null && rawGheHost !== "" && isValidGheHost(rawGheHost)
+      ? (rawGheHost as string).trim()
+      : undefined;
+  if (explicitToken) {
+    checks.push({
+      code: "copilot_token_source",
+      level: "info",
+      message: "Token sourced from `adapterConfig.copilotToken` (BYOK).",
+    });
+  } else {
+    const searchEnv: Record<string, string | undefined> = {
+      ...process.env,
+      ...(envConfig as Record<string, string | undefined>),
+    };
+    const resolved = await resolveCopilotToken(searchEnv, validatedGheHost, tokenSourceHint);
+    if (resolved) {
+      checks.push({
+        code: "copilot_token_source",
+        level: "info",
+        message: `Token resolved via ${resolved.source}.`,
+      });
+    } else {
+      checks.push({
+        code: "copilot_token_unresolved",
+        level: "info",
+        message: "No token resolved from env or `gh auth token`. Copilot CLI will use its own `~/.copilot/` auth state.",
+        hint: "Run `copilot login` on the host, or set GH_TOKEN / COPILOT_GITHUB_TOKEN in adapterConfig.env, or set adapterConfig.copilotToken.",
+      });
+    }
+  }
+
+  // Active default model probe — shows what the user's `~/.copilot/config.json`
+  // points to. Doesn't fail; just informational.
+  const detectedModel = await detectCopilotLocalModel();
+  if (detectedModel) {
+    checks.push({
+      code: "copilot_default_model",
+      level: "info",
+      message: `Active default model: ${detectedModel.model}`,
+      detail: detectedModel.source,
+    });
+  }
+
   const canRunProbe =
-    checks.every((check) => check.code !== "copilot_cwd_invalid" && check.code !== "copilot_command_unresolvable");
+    checks.every((check) => check.code !== "copilot_cwd_invalid" && check.code !== "copilot_command_unresolvable" && check.code !== "copilot_ghehost_invalid");
   if (canRunProbe) {
     if (!commandLooksLike(command, "copilot")) {
       checks.push({
