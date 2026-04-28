@@ -46,7 +46,8 @@ If you skip step 3, the post-merge `Release` workflow will fail with the 404 abo
 ## When release fails
 
 - Read the workflow logs first. The most common failure modes:
-  - **404 PUT on first OIDC publish** → trusted publisher not configured. Fix per "Bootstrap order" step 3, then `gh run rerun <id> --failed`.
-  - **`packages failed to publish: ... is not in this registry`** → same as above; npm's wording is identical for "not authorized" and "doesn't exist."
+  - **404 PUT on every OIDC publish, regardless of trusted-publisher config** → the runner's bundled npm is too old. Trusted-publisher OIDC requires **npm 11.5.1+**. Node 20 and Node 22 ship npm 10.x; only Node 24+ ships npm 11. The release workflow pins `node-version: 24` for this reason — `engines.node: ">=20"` controls runtime, not the CI runner. Symptom in the log: provenance attestation signs successfully but the registry PUT 404s anyway. Self-upgrading via `npm install -g npm@latest` mid-run breaks because npm overwrites its own modules — bump the runner's Node version instead.
+  - **404 PUT on first OIDC publish for a specific new package** → trusted publisher not configured. Fix per "Bootstrap order" step 3, then `gh run rerun <id> --failed`.
+  - **`packages failed to publish: ... is not in this registry`** → same as above two; npm's wording is identical for "not authorized," "doesn't exist," and "tokenless OIDC handshake never completed."
   - **`Check packages` failed in release.yml** → README or `paperclip.adapterUiParser` drift. Fix the underlying issue, push, the workflow re-runs.
 - Manual `npm publish` is a last resort, not a workaround. Each manual publish breaks provenance attestation and skips the OIDC chain we rely on for supply-chain integrity (per Berceuse's threat model).
