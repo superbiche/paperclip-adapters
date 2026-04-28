@@ -1,13 +1,23 @@
 export const type = "copilot_local";
 export const label = "GitHub Copilot CLI (local)";
 
-export const models: { id: string; label: string }[] = [
-  { id: "gpt-5.4", label: "GPT 5.4" },
-  { id: "gpt-5.4-mini", label: "GPT 5.4 Mini" },
-  { id: "gpt-5.2", label: "GPT 5.2" },
+/**
+ * Static fallback list returned when dynamic model discovery fails (no token,
+ * offline, API unreachable). The factory wires `listModels` to call the live
+ * Copilot API first; this list is the graceful-degradation path.
+ */
+export const FALLBACK_MODELS: { id: string; label: string }[] = [
   { id: "claude-sonnet-4.6", label: "Claude Sonnet 4.6" },
-  { id: "claude-opus-4.6", label: "Claude Opus 4.6" },
   { id: "claude-haiku-4.5", label: "Claude Haiku 4.5" },
+  { id: "claude-opus-4.6", label: "Claude Opus 4.6" },
+  { id: "gpt-4.1", label: "GPT-4.1" },
+  { id: "gpt-4o", label: "GPT-4o" },
+  { id: "gpt-5-mini", label: "GPT-5 mini" },
+  { id: "gpt-5.4", label: "GPT-5.4" },
+  { id: "gpt-5.2-codex", label: "GPT-5.2-Codex" },
+  { id: "gpt-5.3-codex", label: "GPT-5.3-Codex" },
+  { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
+  { id: "grok-code-fast-1", label: "Grok Code Fast 1" },
 ];
 
 export const agentConfigurationDoc = `# copilot_local agent configuration
@@ -27,7 +37,7 @@ Don't use when:
 Core fields:
 - command (string, optional): defaults to \`copilot\`
 - cwd (string, optional): default absolute working directory for the agent process
-- model (string, optional): model id (e.g. \`gpt-5.4\`, \`claude-sonnet-4.6\`)
+- model (string, optional): model id (e.g. \`gpt-5.4\`, \`claude-sonnet-4.6\`). The available list is discovered dynamically from Copilot's \`/models\` API when a token is resolvable; falls back to a hardcoded list otherwise.
 - effort (string, optional): reasoning effort (\`low\` | \`medium\` | \`high\` | \`xhigh\`)
 - promptTemplate (string, optional): heartbeat prompt template
 - dangerouslySkipPermissions (boolean, optional): pass \`--allow-all\` instead of \`--allow-all-tools\`

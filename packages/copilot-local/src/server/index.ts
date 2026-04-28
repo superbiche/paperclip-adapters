@@ -2,8 +2,9 @@ import type {
   AdapterSessionManagement,
   ServerAdapterModule,
 } from "@paperclipai/adapter-utils";
-import { agentConfigurationDoc, models, type } from "../index.js";
+import { agentConfigurationDoc, FALLBACK_MODELS, type } from "../index.js";
 import { execute } from "./execute.js";
+import { listCopilotLocalModels } from "./models.js";
 import { sessionCodec } from "./sessionCodec.js";
 import { testEnvironment } from "./test.js";
 
@@ -28,6 +29,7 @@ export {
   fetchWithRetry,
   type FetchRetryOptions,
 } from "./fetch-with-retry.js";
+export { listCopilotLocalModels, isValidGheHost } from "./models.js";
 
 export const sessionManagement: AdapterSessionManagement = {
   supportsSessionResume: true,
@@ -47,7 +49,8 @@ export function createServerAdapter(): ServerAdapterModule {
     testEnvironment,
     sessionCodec,
     sessionManagement,
-    models,
+    models: FALLBACK_MODELS,
+    listModels: listCopilotLocalModels,
     supportsLocalAgentJwt: true,
     supportsInstructionsBundle: true,
     agentConfigurationDoc,
