@@ -39,6 +39,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Check package drift (README + manifest fields)
+        run: pnpm check:packages
+
       - name: Build packages
         run: pnpm -r build
 

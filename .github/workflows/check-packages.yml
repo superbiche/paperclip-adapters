@@ -1,0 +1,35 @@
+name: Check packages
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Drift check (README + manifest fields)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Run check
+        run: pnpm check:packages
