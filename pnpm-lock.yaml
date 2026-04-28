@@ -27,6 +27,12 @@ importers:
         specifier: ^2026.416.0
         version: 2026.416.0
 
+  packages/copilot-local:
+    dependencies:
+      '@paperclipai/adapter-utils':
+        specifier: ^2026.416.0
+        version: 2026.416.0
+
   packages/qwen-local:
     dependencies:
       '@paperclipai/adapter-utils':

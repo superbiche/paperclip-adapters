@@ -7,3 +7,7 @@ dist/
 # Local Claude Code context (private, never committed)
 CLAUDE.local.md
 .claude/settings.local.json
+
+# Smoke-test playground (gitignored)
+/playground/
+/tmp/

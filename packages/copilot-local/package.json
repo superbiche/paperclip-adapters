@@ -1,0 +1,51 @@
+{
+  "name": "@superbiche/copilot-paperclip-adapter",
+  "version": "0.1.0",
+  "description": "Paperclip external adapter that spawns the GitHub Copilot CLI as a managed employee.",
+  "type": "module",
+  "license": "MIT",
+  "homepage": "https://github.com/superbiche/paperclip-adapters/tree/main/packages/copilot-local#readme",
+  "bugs": {
+    "url": "https://github.com/superbiche/paperclip-adapters/issues"
+  },
+  "keywords": [
+    "paperclip",
+    "paperclipai",
+    "adapter",
+    "copilot",
+    "github-copilot",
+    "agent",
+    "ai",
+    "coding-agent",
+    "llm",
+    "orchestration"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/superbiche/paperclip-adapters",
+    "directory": "packages/copilot-local"
+  },
+  "paperclip": {
+    "adapterUiParser": "1.0.0"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./server": "./dist/server/index.js",
+    "./ui-parser": "./dist/ui-parser.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@paperclipai/adapter-utils": "^2026.416.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
