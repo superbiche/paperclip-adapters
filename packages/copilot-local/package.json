@@ -1,6 +1,6 @@
 {
   "name": "@superbiche/copilot-paperclip-adapter",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Paperclip external adapter that spawns the GitHub Copilot CLI as a managed employee. Foundation by @tjp2021 (paperclipai/paperclip#2085); auth + provider-BYOK + skill-injection feature set by @HearthCore (paperclipai/paperclip#3629); ported to external-plugin shape by @superbiche.",
   "type": "module",
   "license": "MIT",
