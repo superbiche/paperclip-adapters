@@ -16,6 +16,18 @@ export {
 } from "./parse.js";
 export { sessionCodec } from "./sessionCodec.js";
 export { testEnvironment } from "./test.js";
+export {
+  resolveCopilotToken,
+  validateCopilotToken,
+  isCopilotAuthError,
+  buildCopilotHeaders,
+  discoverCopilotApiUrl,
+  type CopilotTokenResult,
+} from "./auth.js";
+export {
+  fetchWithRetry,
+  type FetchRetryOptions,
+} from "./fetch-with-retry.js";
 
 export const sessionManagement: AdapterSessionManagement = {
   supportsSessionResume: true,
