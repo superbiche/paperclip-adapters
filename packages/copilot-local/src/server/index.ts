@@ -6,6 +6,7 @@ import { agentConfigurationDoc, FALLBACK_MODELS, type } from "../index.js";
 import { execute } from "./execute.js";
 import { listCopilotLocalModels } from "./models.js";
 import { sessionCodec } from "./sessionCodec.js";
+import { listCopilotLocalSkills, syncCopilotLocalSkills } from "./skills.js";
 import { testEnvironment } from "./test.js";
 
 export { execute } from "./execute.js";
@@ -31,6 +32,11 @@ export {
 } from "./fetch-with-retry.js";
 export { listCopilotLocalModels, isValidGheHost } from "./models.js";
 export { detectCopilotLocalModel } from "./detect-model.js";
+export {
+  listCopilotLocalSkills,
+  syncCopilotLocalSkills,
+  resolveCopilotLocalDesiredSkillNames,
+} from "./skills.js";
 
 export const sessionManagement: AdapterSessionManagement = {
   supportsSessionResume: true,
@@ -52,6 +58,8 @@ export function createServerAdapter(): ServerAdapterModule {
     sessionManagement,
     models: FALLBACK_MODELS,
     listModels: listCopilotLocalModels,
+    listSkills: listCopilotLocalSkills,
+    syncSkills: syncCopilotLocalSkills,
     supportsLocalAgentJwt: true,
     supportsInstructionsBundle: true,
     agentConfigurationDoc,

@@ -1,4 +1,6 @@
+import fs from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { AdapterExecutionContext, AdapterExecutionResult } from "@paperclipai/adapter-utils";
 import type { RunProcessResult } from "@paperclipai/adapter-utils/server-utils";
 import {
@@ -15,6 +17,9 @@ import {
   renderTemplate,
   runChildProcess,
   joinPromptSections,
+  readPaperclipRuntimeSkillEntries,
+  resolvePaperclipDesiredSkillNames,
+  ensurePaperclipSkillSymlink,
 } from "@paperclipai/adapter-utils/server-utils";
 import {
   parseCopilotJsonl,
@@ -24,6 +29,61 @@ import {
 } from "./parse.js";
 import { resolveCopilotToken, validateCopilotToken } from "./auth.js";
 import { isValidGheHost } from "./models.js";
+
+const __moduleDir = path.dirname(fileURLToPath(import.meta.url));
+
+/**
+ * Ensure desired Paperclip-managed skills are present (as symlinks) in the
+ * per-cwd cache dir, and prune stale entries. Returns warnings from any
+ * symlink failures. The directory itself is set as `COPILOT_SKILLS_DIRS`
+ * elsewhere in the runtime config builder.
+ */
+async function ensureCopilotSkillsInjected(
+  config: Record<string, unknown>,
+  onLog: AdapterExecutionContext["onLog"],
+  skillsCacheDir: string,
+): Promise<string[]> {
+  const allSkillsEntries = await readPaperclipRuntimeSkillEntries(config, __moduleDir);
+  const desiredSkillNames = resolvePaperclipDesiredSkillNames(config, allSkillsEntries);
+  const desiredSet = new Set(desiredSkillNames);
+  const skillsEntries = allSkillsEntries.filter((entry) => desiredSet.has(entry.key));
+  if (skillsEntries.length === 0) return [];
+
+  await fs.mkdir(skillsCacheDir, { recursive: true });
+  const warnings: string[] = [];
+  const activeNames = new Set<string>();
+
+  for (const entry of skillsEntries) {
+    activeNames.add(entry.runtimeName);
+    const target = path.join(skillsCacheDir, entry.runtimeName);
+    try {
+      const result = await ensurePaperclipSkillSymlink(entry.source, target);
+      if (result === "skipped") continue;
+      await onLog(
+        "stdout",
+        `[paperclip] ${result === "repaired" ? "Repaired" : "Injected"} Copilot skill "${entry.runtimeName}" into ${skillsCacheDir}\n`,
+      );
+    } catch (err) {
+      const msg = `Failed to inject Copilot skill "${entry.key}" into ${skillsCacheDir}: ${err instanceof Error ? err.message : String(err)}`;
+      warnings.push(msg);
+      await onLog("stderr", `[paperclip] ${msg}\n`);
+    }
+  }
+
+  // Prune stale symlinks no longer in the desired set.
+  const dirEntries = await fs.readdir(skillsCacheDir, { withFileTypes: true }).catch(() => []);
+  for (const entry of dirEntries) {
+    if (activeNames.has(entry.name) || !entry.isSymbolicLink()) continue;
+    const target = path.join(skillsCacheDir, entry.name);
+    await fs.unlink(target).catch(() => {});
+    await onLog(
+      "stdout",
+      `[paperclip] Removed stale Copilot skill "${entry.name}" from ${skillsCacheDir}\n`,
+    );
+  }
+
+  return warnings;
+}
 
 interface CopilotRuntimeConfig {
   command: string;
@@ -127,6 +187,16 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
     context,
   });
   const { command, cwd, env, timeoutSec, graceSec, extraArgs, tokenSource } = runtimeConfig;
+
+  // Skill injection (ephemeral): symlink Paperclip-managed skills into a
+  // per-cwd cache, then point Copilot CLI at the cache via COPILOT_SKILLS_DIRS.
+  // Empty `desiredSkills` → no-op (cache untouched, env var unset).
+  const skillsCacheDir = path.join(cwd, ".paperclip", "copilot-skill-cache");
+  await ensureCopilotSkillsInjected(config, onLog, skillsCacheDir);
+  const skillCacheContents = await fs.readdir(skillsCacheDir).catch(() => [] as string[]);
+  if (skillCacheContents.length > 0) {
+    env.COPILOT_SKILLS_DIRS = skillsCacheDir;
+  }
 
   const runtimeSessionParams = parseObject(runtime.sessionParams);
   const runtimeSessionId = asString(runtimeSessionParams.sessionId, runtime.sessionId ?? "");
