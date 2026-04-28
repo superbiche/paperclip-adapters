@@ -156,6 +156,22 @@ describe("fetchWithRetry", () => {
     );
   });
 
+  it("treats Retry-After: 0 as 'retry immediately' (delayMs: 0)", async () => {
+    fetchSpy
+      .mockResolvedValueOnce(fakeResponse(429, { "retry-after": "0" }))
+      .mockResolvedValueOnce(fakeResponse(200));
+    const onRetry = vi.fn();
+    await fetchWithRetry(url, init, {
+      maxRetries: 2,
+      baseDelayMs: 60_000,
+      maxDelayMs: 60_000,
+      onRetry,
+    });
+    expect(onRetry).toHaveBeenCalledWith(
+      expect.objectContaining({ delayMs: 0, retryAfterHeader: "0" }),
+    );
+  });
+
   it("caps delay at maxDelayMs", async () => {
     fetchSpy
       .mockResolvedValueOnce(fakeResponse(429, { "retry-after": "60" }))
