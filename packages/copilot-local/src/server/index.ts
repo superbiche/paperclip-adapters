@@ -30,6 +30,7 @@ export {
   type FetchRetryOptions,
 } from "./fetch-with-retry.js";
 export { listCopilotLocalModels, isValidGheHost } from "./models.js";
+export { detectCopilotLocalModel } from "./detect-model.js";
 
 export const sessionManagement: AdapterSessionManagement = {
   supportsSessionResume: true,
