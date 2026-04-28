@@ -43,7 +43,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@paperclipai/adapter-utils": "^2026.416.0"
+    "@paperclipai/adapter-utils": "^2026.427.0"
   },
   "engines": {
     "node": ">=20.0.0"

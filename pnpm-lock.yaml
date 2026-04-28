@@ -30,8 +30,8 @@ importers:
   packages/copilot-local:
     dependencies:
       '@paperclipai/adapter-utils':
-        specifier: ^2026.416.0
-        version: 2026.416.0
+        specifier: ^2026.427.0
+        version: 2026.427.0
 
   packages/qwen-local:
     dependencies:
@@ -270,6 +270,9 @@ packages:
 
   '@paperclipai/adapter-utils@2026.416.0':
     resolution: {integrity: sha512-uSbrE2SOj6N3x0v5eW+bt0r+4hgJYoLawDM5oBJ+EG+CCZ9+g3wqr4M/GONy8Gx8U+pHLRnq+Z94p0biZrktSQ==}
+
+  '@paperclipai/adapter-utils@2026.427.0':
+    resolution: {integrity: sha512-whfjXcWmUCc89+ty/NQ+ZKLMTz9hJgjuyU08CJAGTY8vbo8WDJeOZqRoepdlvjSS4eeewB+uFrbAaBg062qzhw==}
 
   '@rollup/rollup-android-arm-eabi@4.60.2':
     resolution: {integrity: sha512-dnlp69efPPg6Uaw2dVqzWRfAWRnYVb1XJ8CyyhIbZeaq4CA5/mLeZ1IEt9QqQxmbdvagjLIm2ZL8BxXv5lH4Yw==}
@@ -1154,6 +1157,8 @@ snapshots:
       fastq: 1.20.1
 
   '@paperclipai/adapter-utils@2026.416.0': {}
+
+  '@paperclipai/adapter-utils@2026.427.0': {}
 
   '@rollup/rollup-android-arm-eabi@4.60.2':
     optional: true
