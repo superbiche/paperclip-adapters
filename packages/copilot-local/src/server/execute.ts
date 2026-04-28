@@ -29,6 +29,7 @@ import {
 } from "./parse.js";
 import { resolveCopilotToken, validateCopilotToken } from "./auth.js";
 import { isValidGheHost } from "./models.js";
+import { applyCopilotProviderEnv } from "./provider.js";
 
 const __moduleDir = path.dirname(fileURLToPath(import.meta.url));
 
@@ -93,11 +94,17 @@ interface CopilotRuntimeConfig {
   graceSec: number;
   extraArgs: string[];
   /**
-   * Where the Copilot auth token came from on this run, or `null` when no
-   * token was resolved (the host's `~/.copilot/` state is the only auth path).
+   * Where the GitHub auth token came from on this run, or `null` when no
+   * token was resolved (the host's `~/.copilot/` state is the only auth path,
+   * or provider-BYOK mode is active and the GitHub token is irrelevant).
    * Surfaced via `onMeta` for diagnostics; never logged in plaintext.
    */
   tokenSource: string | null;
+  /**
+   * When provider BYOK is active, the configured base URL. Surfaced via
+   * `onMeta` so diagnostics can confirm which provider drove the run.
+   */
+  providerBaseUrl: string | null;
 }
 
 async function buildCopilotRuntimeConfig(input: {
@@ -123,7 +130,14 @@ async function buildCopilotRuntimeConfig(input: {
     if (typeof value === "string") env[key] = value;
   }
 
-  // Auth resolution: BYOK token (config.copilotToken) > env (config.env or
+  // Provider BYOK takes precedence: when COPILOT_PROVIDER_BASE_URL is set
+  // Copilot CLI bypasses GitHub auth entirely. Validation runs even when
+  // `copilotProvider` is unset (no-op), so any later invalid attempt also
+  // fails closed rather than silently injecting garbage env.
+  const providerActivation = applyCopilotProviderEnv(env, config);
+
+  // GitHub auth resolution chain — only meaningful when provider BYOK is NOT
+  // active. Order: BYOK token (config.githubToken) > env (config.env +
   // process.env) > `gh auth token` CLI fallback. The resolved token is
   // injected into the spawn env as GH_TOKEN so Copilot CLI picks it up.
   // Malformed gheHost values are rejected up front (defense-in-depth on top
@@ -136,16 +150,16 @@ async function buildCopilotRuntimeConfig(input: {
   const tokenSourceHint = asString(config.tokenSource, "auto");
 
   let tokenSource: string | null = null;
-  const explicitToken = asString(config.copilotToken, "").trim();
+  const explicitToken = asString(config.githubToken, "").trim();
   if (explicitToken) {
     const validation = validateCopilotToken(explicitToken);
     if (validation.valid) {
       env.GH_TOKEN = explicitToken;
-      tokenSource = "config:copilotToken";
+      tokenSource = "config:githubToken";
     }
   }
 
-  if (!tokenSource) {
+  if (!tokenSource && !providerActivation.active) {
     // Merge process.env + adapter env so resolveCopilotToken sees both.
     const searchEnv: Record<string, string | undefined> = { ...process.env, ...env };
     const resolved = await resolveCopilotToken(searchEnv, gheHost, tokenSourceHint);
@@ -166,7 +180,16 @@ async function buildCopilotRuntimeConfig(input: {
     return asStringArray(config.args);
   })();
 
-  return { command, cwd, env, timeoutSec, graceSec, extraArgs, tokenSource };
+  return {
+    command,
+    cwd,
+    env,
+    timeoutSec,
+    graceSec,
+    extraArgs,
+    tokenSource,
+    providerBaseUrl: providerActivation.active ? (providerActivation.baseUrl ?? null) : null,
+  };
 }
 
 export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExecutionResult> {
@@ -186,7 +209,7 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
     config,
     context,
   });
-  const { command, cwd, env, timeoutSec, graceSec, extraArgs, tokenSource } = runtimeConfig;
+  const { command, cwd, env, timeoutSec, graceSec, extraArgs, tokenSource, providerBaseUrl } = runtimeConfig;
 
   // Skill injection (ephemeral): symlink Paperclip-managed skills into a
   // per-cwd cache, then point Copilot CLI at the cache via COPILOT_SKILLS_DIRS.
@@ -249,8 +272,9 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
         prompt,
         context: {
           ...context,
-          // Surface where the auth token came from (or null) — never the token itself.
+          // Surface auth provenance for diagnostics — never the secret itself.
           copilotTokenSource: tokenSource,
+          copilotProviderBaseUrl: providerBaseUrl,
         },
       });
     }

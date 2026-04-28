@@ -18,6 +18,7 @@ import { parseCopilotJsonl, detectCopilotAuthRequired } from "./parse.js";
 import { resolveCopilotToken, validateCopilotToken } from "./auth.js";
 import { isValidGheHost } from "./models.js";
 import { detectCopilotLocalModel } from "./detect-model.js";
+import { applyCopilotProviderEnv } from "./provider.js";
 
 function summarizeStatus(checks: AdapterEnvironmentCheck[]): AdapterEnvironmentTestResult["status"] {
   if (checks.some((check) => check.level === "error")) return "fail";
@@ -114,11 +115,34 @@ export async function testEnvironment(
     }
   }
 
-  // Token resolution probe — surfaces which credential source is active for
-  // this agent's runtime. Never logs the token itself. Mirrors the
-  // execute.ts logic exactly: validateCopilotToken rejects classic PATs
-  // before the BYOK path is accepted, falling through to the resolution chain.
-  const explicitToken = asString(config.copilotToken, "").trim();
+  // Provider BYOK probe — when activated, GitHub auth is irrelevant.
+  // Run validation in a throwaway env so we don't leak secret values to
+  // the diagnostic output (the actual injection happens in execute.ts).
+  const probeProviderEnv: Record<string, string> = {};
+  const providerActivation = applyCopilotProviderEnv(probeProviderEnv, config);
+  if (providerActivation.errors.length > 0) {
+    for (const err of providerActivation.errors) {
+      checks.push({
+        code: "copilot_provider_invalid",
+        level: "error",
+        message: `\`${err.field}\` is invalid: ${err.reason}`,
+      });
+    }
+  } else if (providerActivation.active) {
+    checks.push({
+      code: "copilot_provider_active",
+      level: "info",
+      message: `Custom provider active: ${providerActivation.type}`,
+      detail: providerActivation.baseUrl,
+    });
+  }
+
+  // GitHub-auth probe — only meaningful when provider BYOK is NOT active.
+  // Surfaces which credential source is active for this agent's runtime.
+  // Never logs the token itself. Mirrors execute.ts validation: classic
+  // PATs are rejected at BYOK before the path is accepted, falling
+  // through to the resolution chain.
+  const explicitToken = asString(config.githubToken, "").trim();
   const tokenSourceHint = asString(config.tokenSource, "auto");
   const validatedGheHost =
     rawGheHost !== undefined && rawGheHost !== null && rawGheHost !== "" && isValidGheHost(rawGheHost)
@@ -132,19 +156,19 @@ export async function testEnvironment(
       checks.push({
         code: "copilot_token_source",
         level: "info",
-        message: "Token sourced from `adapterConfig.copilotToken` (BYOK).",
+        message: "GitHub token sourced from `adapterConfig.githubToken` (BYOK).",
       });
     } else {
       checks.push({
         code: "copilot_token_byok_invalid",
         level: "error",
-        message: "`adapterConfig.copilotToken` was rejected by validation.",
+        message: "`adapterConfig.githubToken` was rejected by validation.",
         detail: validation.reason ?? "Token is empty or not a supported type.",
         hint: "Use a fine-grained PAT (`github_pat_…`) or OAuth token (`gho_…` / `ghu_…`). Classic PATs (`ghp_…`) are not accepted by the Copilot API.",
       });
     }
   }
-  if (!byokAccepted) {
+  if (!byokAccepted && !providerActivation.active) {
     const searchEnv: Record<string, string | undefined> = {
       ...process.env,
       ...(envConfig as Record<string, string | undefined>),
@@ -178,8 +202,13 @@ export async function testEnvironment(
     });
   }
 
-  const canRunProbe =
-    checks.every((check) => check.code !== "copilot_cwd_invalid" && check.code !== "copilot_command_unresolvable" && check.code !== "copilot_ghehost_invalid");
+  const canRunProbe = checks.every(
+    (check) =>
+      check.code !== "copilot_cwd_invalid" &&
+      check.code !== "copilot_command_unresolvable" &&
+      check.code !== "copilot_ghehost_invalid" &&
+      check.code !== "copilot_provider_invalid",
+  );
   if (canRunProbe) {
     if (!commandLooksLike(command, "copilot")) {
       checks.push({

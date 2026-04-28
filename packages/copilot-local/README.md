@@ -14,8 +14,9 @@ Built on [paperclipai/paperclip#2085](https://github.com/paperclipai/paperclip/p
 ## Features
 
 - **Session resume** via Copilot's native `--resume=<sessionId>`. Stale-session detection retries cleanly with a fresh session.
-- **BYOK** via `adapterConfig.copilotToken` (paperclip secret), with classic-PAT (`ghp_`) rejection.
-- **Auth resolution chain** when no `copilotToken` is set: `COPILOT_GITHUB_TOKEN` → `GH_TOKEN` → `GITHUB_TOKEN` → `gh auth token` CLI fallback. Tunable via `adapterConfig.tokenSource` (`auto` / `env` / `gh_cli`).
+- **GitHub-side BYOK** via `adapterConfig.githubToken` (paperclip secret), with classic-PAT (`ghp_`) rejection.
+- **Provider BYOK** via `adapterConfig.copilotProvider` — point Copilot CLI at any OpenAI-compatible / Anthropic / Azure endpoint. **No GitHub Copilot subscription required in this mode.** Use cases: Ollama, llama.cpp, vLLM, Foundry Local, direct Anthropic Console, OpenAI direct.
+- **GitHub auth resolution chain** when no `githubToken` and no provider are set: `COPILOT_GITHUB_TOKEN` → `GH_TOKEN` → `GITHUB_TOKEN` → `gh auth token` CLI fallback. Tunable via `adapterConfig.tokenSource` (`auto` / `env` / `gh_cli`).
 - **GitHub Enterprise** support via `adapterConfig.gheHost`. Strict hostname validation rejects malformed values before any side-effect (URLs, schemes, ports, paths, userinfo). When `gheHost` is set, env-token fallback is suppressed (SSRF guard) and `gh auth token --hostname <host>` is used.
 - **Dynamic model discovery** via Copilot's `/models` API (with token-fingerprint cache for endpoint discovery). Falls back to a hardcoded `FALLBACK_MODELS` list when offline / no token.
 - **Skill injection** via `COPILOT_SKILLS_DIRS`. Paperclip-managed skills are symlinked into a per-cwd cache and exposed to the Copilot CLI ephemerally.
@@ -72,7 +73,7 @@ Create a Paperclip agent with `adapterType: "copilot_local"`.
 
 The host's `~/.copilot/` state (after `copilot login`) is used. No token in the agent config.
 
-### BYOK (multi-tenant)
+### GitHub-side BYOK (multi-tenant Copilot subscription)
 
 ```json
 {
@@ -80,13 +81,64 @@ The host's `~/.copilot/` state (after `copilot login`) is used. No token in the 
   "adapterConfig": {
     "command": "copilot",
     "model": "claude-sonnet-4.6",
-    "copilotToken": { "secret_ref": "GITHUB_FINE_GRAINED_PAT" },
+    "githubToken": { "secret_ref": "GITHUB_FINE_GRAINED_PAT" },
     "tokenSource": "auto"
   }
 }
 ```
 
 Use a fine-grained PAT (`github_pat_…`) or an OAuth token (`gho_…` / `ghu_…`). Classic PATs (`ghp_…`) are rejected with a clear error. The token is injected into the spawn env as `GH_TOKEN`; never logged.
+
+### Provider BYOK — local llama.cpp / Ollama (no GitHub Copilot subscription)
+
+```json
+{
+  "adapterType": "copilot_local",
+  "adapterConfig": {
+    "command": "copilot",
+    "model": "qwen-coder",
+    "copilotProvider": {
+      "baseUrl": "http://localhost:11434/v1",
+      "type": "openai",
+      "apiKey": "ollama"
+    }
+  }
+}
+```
+
+For an authenticated llama.cpp server:
+
+```json
+{
+  "adapterConfig": {
+    "command": "copilot",
+    "model": "coder-qwen3.6-q6_k_xl",
+    "copilotProvider": {
+      "baseUrl": "http://homelab.lan:8000/v1",
+      "type": "openai",
+      "bearerToken": { "secret_ref": "LLAMA_API_KEY_HL1" }
+    }
+  }
+}
+```
+
+### Provider BYOK — Anthropic direct
+
+```json
+{
+  "adapterConfig": {
+    "command": "copilot",
+    "model": "claude-sonnet-4-5-20250929",
+    "copilotProvider": {
+      "baseUrl": "https://api.anthropic.com/v1",
+      "type": "anthropic",
+      "apiKey": { "secret_ref": "ANTHROPIC_API_KEY" }
+    }
+  }
+}
+```
+
+In provider-BYOK mode, `COPILOT_PROVIDER_BASE_URL` activates the bypass — GitHub Copilot's routing is skipped entirely. Per `copilot help providers`: *"GitHub authentication is not required when using a custom provider."*
 
 ### GitHub Enterprise
 
