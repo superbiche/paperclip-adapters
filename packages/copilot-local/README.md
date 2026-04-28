@@ -2,7 +2,17 @@
 
 External [Paperclip](https://github.com/paperclipai/paperclip) adapter that spawns the [GitHub Copilot CLI](https://docs.github.com/copilot/how-tos/copilot-cli) as a managed employee. Wraps `copilot` as a subprocess, passes the wake prompt via `-p`, parses `--output-format json` JSONL stdout, and persists Copilot's native `sessionId` so Paperclip can resume across heartbeats via `copilot --resume=<sessionId>`.
 
-Built on [paperclipai/paperclip#2085](https://github.com/paperclipai/paperclip/pull/2085) (tjp2021), extended with the auth + dynamic-discovery + skill-injection feature set from [paperclipai/paperclip#3629](https://github.com/paperclipai/paperclip/pull/3629) (HearthCore).
+## Origin and attribution
+
+The runtime of this adapter combines work from two upstream PRs against [`paperclipai/paperclip`](https://github.com/paperclipai/paperclip):
+
+- **Foundation** — `src/server/execute.ts`, `src/server/parse.ts`, `src/server/test.ts`, `src/ui-parser.ts`, the JSONL parsing, transcript translation, stale-session retry logic, and the initial 54-test suite were **originally authored by [@tjp2021](https://github.com/tjp2021)** in PR [paperclipai/paperclip#2085](https://github.com/paperclipai/paperclip/pull/2085) as an in-tree `packages/adapters/copilot-local` package. Greptile gave the PR a 5/5 confidence score.
+
+- **Auth + features** — `src/server/auth.ts` (token resolution + endpoint discovery + token-fingerprint cache), `src/server/models.ts` (dynamic model discovery), `src/server/detect-model.ts`, `src/server/skills.ts` (skill injection via `COPILOT_SKILLS_DIRS`), the `fetchWithRetry` helper, and the BYOK / GHE / multi-tenant identity handling were **authored by [@HearthCore](https://github.com/HearthCore)** in PR [paperclipai/paperclip#3629](https://github.com/paperclipai/paperclip/pull/3629). The Greptile-flagged SSRF P1 was already addressed at HEAD by HearthCore; this port adds defense-in-depth `gheHost` format validation on top.
+
+After PR [paperclipai/paperclip#2218](https://github.com/paperclipai/paperclip/pull/2218) shipped the external adapter plugin system, the ecosystem direction shifted toward third-party adapter packages over in-tree additions. With both PRs sitting unmerged in the upstream queue, the adapter was assembled out-of-tree into this external package — preserving both authors' work, with the SSRF defense-in-depth fix applied during port and provider-BYOK (`adapterConfig.copilotProvider`) added as a new first-class config surface for the use case Copilot CLI's `copilot help providers` actually documents.
+
+The external-plugin port — `src/server/index.ts` factory exposing `createServerAdapter()`, `sessionManagement` declaration, inlined self-contained `src/ui-parser.ts`, `src/server/provider.ts` provider-BYOK validation/injection, stand-alone `tsconfig.json`, and the workspace packaging — was done by [@superbiche](https://github.com/superbiche) / [@tsbwc](https://github.com/tsbwc). Smoke-tested end-to-end against a paperclip-dev instance with both GitHub-mode and provider-mode (homelab llama.cpp via `coder-qwen3.6-q6_k_xl`).
 
 ## Status
 
