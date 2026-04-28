@@ -15,7 +15,7 @@ import {
 } from "@paperclipai/adapter-utils/server-utils";
 import path from "node:path";
 import { parseCopilotJsonl, detectCopilotAuthRequired } from "./parse.js";
-import { resolveCopilotToken } from "./auth.js";
+import { resolveCopilotToken, validateCopilotToken } from "./auth.js";
 import { isValidGheHost } from "./models.js";
 import { detectCopilotLocalModel } from "./detect-model.js";
 
@@ -115,20 +115,36 @@ export async function testEnvironment(
   }
 
   // Token resolution probe — surfaces which credential source is active for
-  // this agent's runtime. Never logs the token itself.
+  // this agent's runtime. Never logs the token itself. Mirrors the
+  // execute.ts logic exactly: validateCopilotToken rejects classic PATs
+  // before the BYOK path is accepted, falling through to the resolution chain.
   const explicitToken = asString(config.copilotToken, "").trim();
   const tokenSourceHint = asString(config.tokenSource, "auto");
   const validatedGheHost =
     rawGheHost !== undefined && rawGheHost !== null && rawGheHost !== "" && isValidGheHost(rawGheHost)
       ? (rawGheHost as string).trim()
       : undefined;
+  let byokAccepted = false;
   if (explicitToken) {
-    checks.push({
-      code: "copilot_token_source",
-      level: "info",
-      message: "Token sourced from `adapterConfig.copilotToken` (BYOK).",
-    });
-  } else {
+    const validation = validateCopilotToken(explicitToken);
+    if (validation.valid) {
+      byokAccepted = true;
+      checks.push({
+        code: "copilot_token_source",
+        level: "info",
+        message: "Token sourced from `adapterConfig.copilotToken` (BYOK).",
+      });
+    } else {
+      checks.push({
+        code: "copilot_token_byok_invalid",
+        level: "error",
+        message: "`adapterConfig.copilotToken` was rejected by validation.",
+        detail: validation.reason ?? "Token is empty or not a supported type.",
+        hint: "Use a fine-grained PAT (`github_pat_…`) or OAuth token (`gho_…` / `ghu_…`). Classic PATs (`ghp_…`) are not accepted by the Copilot API.",
+      });
+    }
+  }
+  if (!byokAccepted) {
     const searchEnv: Record<string, string | undefined> = {
       ...process.env,
       ...(envConfig as Record<string, string | undefined>),

@@ -75,22 +75,21 @@ When a new gap surfaces, categorise as:
 
 **Priority:** cosmetic. Works for `cline_local` and `qwen_local` because both match the `_local` convention.
 
-### `copilot_local` v0.1 has no first-class auth resolution chain
+### `copilot_local` device-flow login is not exposable as an in-Paperclip flow
 
-**Gap:** `@superbiche/copilot-paperclip-adapter@0.1.0` ports [paperclipai/paperclip#2085](https://github.com/paperclipai/paperclip/pull/2085) (tjp2021), which spawns the `copilot` binary directly and inherits whatever auth state the host has — pre-authenticated `~/.copilot/` (after `copilot login`) or `GH_TOKEN`/`GITHUB_TOKEN` env. The adapter's `detectCopilotAuthRequired` flags failures via stderr regex but does not resolve, refresh, or inject tokens.
+**Gap:** Copilot's interactive `copilot login` device-flow works fine on the Paperclip host (and we use it for tier-2 smoke), but it cannot be surfaced through Paperclip's UI / API the way `claude_local`'s `/api/agents/:id/claude-login` is. The relevant route in [paperclipai/paperclip#3629](https://github.com/paperclipai/paperclip/pull/3629) (HearthCore) — `/api/agents/:id/copilot-login`, an SSE endpoint streaming device-flow URL + user-code chunks — lives in `server/src/routes/agents.ts` on the paperclip side. An external adapter has no extension point to register paperclip-side HTTP routes.
 
 **Practical impact:**
-- K8s/CI deployments must bake the token into Paperclip's env via a Secret. No per-agent BYOK.
-- No GitHub Enterprise (GHE) host override — the upstream Copilot host is implicit.
-- No token-fingerprint cache, so multi-tenant Paperclip instances can't safely run different `copilot_local` agents under different identities concurrently.
-- Copilot CLI's interactive `copilot login` device-flow is not exposed to Paperclip — the user must run it on the host as the same OS user Paperclip runs as.
+- Re-authentication after token rotation requires a host-side `copilot login` invocation by an OS user with shell access to the Paperclip process's home — not a UI-driven flow.
+- Multi-tenant Paperclip deployments cannot let individual users (re)authenticate their Copilot identity through the agent-detail page; the Paperclip-instance operator does it for them.
 
-**Shape of fix (deferred to v0.2+):**
-- Port [#3629](https://github.com/paperclipai/paperclip/pull/3629) (HearthCore) — adds BYOK + GHE host override + `fetchWithRetry` + token-fingerprint cache (`tokenFingerprint(token)@host` keyed). One P1 (SSRF via `gheHost` query) must be fixed during port: validate `gheHost` against the persisted agent config, never trust request hints with env-token fallback.
-- Port [#3246](https://github.com/paperclipai/paperclip/pull/3246) (oespinozai) — token-resolution chain: pre-fetched token → PAT → `gh auth token`. Cleaner separation of concerns than #3629's single execute.ts.
-- Either route requires an upstream extension point for adapter-owned HTTP routes if we want the device-flow login surface (#3629's `/api/agents/:id/copilot-login` SSE endpoint isn't shippable in an external adapter today).
+**Workaround (shipped in `@superbiche/copilot-paperclip-adapter@0.1.0`):**
+- BYOK via `adapterConfig.copilotToken` (paperclip secret) covers the multi-tenant case.
+- The full auth resolution chain (env → `gh auth token`) covers the homelab + CI cases.
+- Host-side `copilot login` covers the homelab + interactive case.
 
-**Priority:** medium. Acceptable for the current Berceuse threat model (single-tenant homelab Paperclip on HL3, single GitHub identity). Becomes blocking when:
-- Multiple Copilot identities need to run concurrently in the same Paperclip instance, OR
-- A GHE host (vs github.com) is required, OR
-- We want UI-driven re-auth instead of host-side `copilot login`.
+**Shape of fix:**
+- Upstream extension point for external adapters to register HTTP routes scoped under `/api/adapters/<type>/...` or `/api/agents/:id/adapters/<type>/...`. The plugin loader would need to call the adapter's `registerRoutes(router)` at install-time. Probably wants its own RFC.
+- Or: paperclip core gains a generic "device-flow proxy" route that adapters expose intent for, and core handles the SSE + state-machine bookkeeping.
+
+**Priority:** medium-low. The BYOK + auth chain shipped in this package's v0.1.0 covers the realistic deployment shapes. The UI-driven flow is a UX nice-to-have, not a capability gap.
