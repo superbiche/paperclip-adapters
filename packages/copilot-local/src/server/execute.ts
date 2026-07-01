@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { StringDecoder } from "node:string_decoder";
 import { fileURLToPath } from "node:url";
 import type { AdapterExecutionContext, AdapterExecutionResult } from "@paperclipai/adapter-utils";
 import type { RunProcessResult } from "@paperclipai/adapter-utils/server-utils";
@@ -176,10 +177,18 @@ export async function loadCopilotInstructionsBundle(
       break;
     }
     try {
-      let contents = await fs.readFile(file, "utf8");
-      if (totalBytes + Buffer.byteLength(contents, "utf8") > MAX_INSTRUCTIONS_BYTES) {
-        contents = contents.slice(0, MAX_INSTRUCTIONS_BYTES - totalBytes);
-      }
+      // Read as raw bytes so the MAX_INSTRUCTIONS_BYTES cap is enforced on a
+      // real byte boundary. Truncating a UTF-8 *string* by character count
+      // (String.prototype.slice) overshoots the byte cap for multibyte content
+      // and can also split a surrogate pair. StringDecoder.write() decodes only
+      // the complete characters in the truncated buffer and drops any partial
+      // trailing multibyte sequence, giving a clean byte-bounded slice.
+      const raw = await fs.readFile(file);
+      const remaining = MAX_INSTRUCTIONS_BYTES - totalBytes;
+      const contents =
+        raw.length > remaining
+          ? new StringDecoder("utf8").write(raw.subarray(0, remaining))
+          : raw.toString("utf8");
       totalBytes += Buffer.byteLength(contents, "utf8");
       const base = path.basename(file);
       sections.push(`===== ${base} =====\n${contents.trim()}`);

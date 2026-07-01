@@ -95,4 +95,36 @@ describe("loadCopilotInstructionsBundle", () => {
     expect(bundle.prompt).toBe("");
     expect(bundle.notes.join(" ")).toMatch(/no files could be read/i);
   });
+
+  it("enforces the byte cap on a real byte boundary for multibyte content", async () => {
+    const MAX_INSTRUCTIONS_BYTES = 256 * 1024;
+    const root = path.join(tmpDir, "instr-cap");
+    await fs.mkdir(root, { recursive: true });
+    // 🎯 is 4 UTF-8 bytes and a surrogate pair in UTF-16. Produce well over the
+    // cap so truncation is exercised; a char-based slice would both overshoot
+    // the byte cap (~2x) and risk splitting a surrogate pair.
+    const oversized = "🎯".repeat(200_000); // ~800 KB
+    await fs.writeFile(path.join(root, "AGENTS.md"), oversized, "utf8");
+
+    const bundle = await loadCopilotInstructionsBundle(
+      { instructionsFilePath: path.join(root, "AGENTS.md"), instructionsRootPath: root },
+      noopLog,
+    );
+
+    // Only the emoji payload is capped; count injected emoji code points.
+    const emojiCount = [...bundle.prompt].filter((c) => c === "🎯").length;
+    expect(emojiCount).toBeGreaterThan(0);
+    // Byte cap must hold: emoji bytes injected never exceed MAX_INSTRUCTIONS_BYTES.
+    expect(emojiCount * 4).toBeLessThanOrEqual(MAX_INSTRUCTIONS_BYTES);
+    // No broken decoding: truncation must not leave a replacement char / lone surrogate.
+    expect(bundle.prompt).not.toContain("\uFFFD");
+    // Iterating by code point keeps valid surrogate pairs together (length 2);
+    // a lone surrogate would surface as a single length-1 code unit in range.
+    const hasLoneSurrogate = [...bundle.prompt].some((u) => {
+      if (u.length !== 1) return false;
+      const code = u.charCodeAt(0);
+      return code >= 0xd800 && code <= 0xdfff;
+    });
+    expect(hasLoneSurrogate).toBe(false);
+  });
 });
