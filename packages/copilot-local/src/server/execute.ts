@@ -86,6 +86,149 @@ async function ensureCopilotSkillsInjected(
   return warnings;
 }
 
+/**
+ * Result of loading the Paperclip-managed agent instructions bundle.
+ */
+interface CopilotInstructionsBundle {
+  /** Markdown block to prepend to the run prompt (empty when nothing loaded). */
+  prompt: string;
+  /** Absolute directory to expose to Copilot via `--add-dir` (empty when none). */
+  addDir: string;
+  /** Human-readable notes surfaced in adapter meta/diagnostics. */
+  notes: string[];
+  /** Total characters of instruction content injected into the prompt. */
+  chars: number;
+  /** Bundle files that were successfully loaded (basenames). */
+  loadedFiles: string[];
+}
+
+// Cap the injected bundle so a misconfigured instructions directory cannot
+// balloon the prompt. Paperclip's managed bundle is a handful of small files.
+const MAX_INSTRUCTIONS_BYTES = 256 * 1024;
+
+/**
+ * Load the Paperclip-managed agent instructions bundle and turn it into a
+ * prompt preamble for the Copilot CLI.
+ *
+ * Paperclip advertises the bundle to adapters that set
+ * `supportsInstructionsBundle: true` via three adapter-config keys:
+ * - `instructionsFilePath`  — absolute path to the entry file (e.g. AGENTS.md)
+ * - `instructionsRootPath`  — directory holding the full managed bundle
+ * - `instructionsEntryFile` — the entry file's basename
+ *
+ * Copilot only natively auto-loads `AGENTS.md`; the operational contract that
+ * drives issue checkout and, crucially, the *final issue disposition* lives in
+ * sibling files (e.g. `HEARTBEAT.md`). We therefore concatenate the entry file
+ * plus every other `*.md` in the bundle root into the prompt so the agent has
+ * the complete operating contract on a fresh, non-resumed run. The root is also
+ * returned for `--add-dir` so relative references and re-reads resolve.
+ */
+export async function loadCopilotInstructionsBundle(
+  config: Record<string, unknown>,
+  onLog: AdapterExecutionContext["onLog"],
+): Promise<CopilotInstructionsBundle> {
+  const empty: CopilotInstructionsBundle = {
+    prompt: "",
+    addDir: "",
+    notes: [],
+    chars: 0,
+    loadedFiles: [],
+  };
+
+  const instructionsFilePath = asString(config.instructionsFilePath, "").trim();
+  const instructionsRootPath = asString(config.instructionsRootPath, "").trim();
+  if (!instructionsFilePath && !instructionsRootPath) return empty;
+
+  const rootDir = instructionsRootPath
+    ? path.resolve(instructionsRootPath)
+    : path.dirname(path.resolve(instructionsFilePath));
+  const entryFile = instructionsFilePath ? path.resolve(instructionsFilePath) : "";
+
+  // Ordered, de-duplicated list of bundle files: entry first, then remaining
+  // top-level `*.md` files in the root (sorted for determinism).
+  const files: string[] = [];
+  const seen = new Set<string>();
+  const pushFile = (candidate: string) => {
+    const resolved = path.resolve(candidate);
+    if (seen.has(resolved)) return;
+    seen.add(resolved);
+    files.push(resolved);
+  };
+  if (entryFile) pushFile(entryFile);
+  try {
+    const dirEntries = await fs.readdir(rootDir, { withFileTypes: true });
+    for (const dirEntry of dirEntries
+      .filter((e) => e.isFile() && e.name.toLowerCase().endsWith(".md"))
+      .sort((a, b) => a.name.localeCompare(b.name))) {
+      pushFile(path.join(rootDir, dirEntry.name));
+    }
+  } catch {
+    // Root unreadable (or only an entry file was supplied) — fall back to entry.
+  }
+
+  const sections: string[] = [];
+  const loadedFiles: string[] = [];
+  const notes: string[] = [];
+  let totalBytes = 0;
+  for (const file of files) {
+    if (totalBytes >= MAX_INSTRUCTIONS_BYTES) {
+      notes.push(`Skipped remaining instruction files after ${MAX_INSTRUCTIONS_BYTES} bytes.`);
+      break;
+    }
+    try {
+      let contents = await fs.readFile(file, "utf8");
+      if (totalBytes + Buffer.byteLength(contents, "utf8") > MAX_INSTRUCTIONS_BYTES) {
+        contents = contents.slice(0, MAX_INSTRUCTIONS_BYTES - totalBytes);
+      }
+      totalBytes += Buffer.byteLength(contents, "utf8");
+      const base = path.basename(file);
+      sections.push(`===== ${base} =====\n${contents.trim()}`);
+      loadedFiles.push(base);
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      await onLog(
+        "stdout",
+        `[paperclip] Warning: could not read instructions file "${file}": ${reason}\n`,
+      );
+    }
+  }
+
+  if (sections.length === 0) {
+    notes.push(
+      `Configured instructions (file "${instructionsFilePath}", root "${instructionsRootPath}"), ` +
+        `but no files could be read; continuing without injected instructions.`,
+    );
+    await onLog(
+      "stdout",
+      `[paperclip] Warning: instructions bundle configured but no files could be read.\n`,
+    );
+    return { ...empty, notes };
+  }
+
+  const preamble =
+    `<paperclip_agent_instructions>\n` +
+    `${sections.join("\n\n")}\n` +
+    `</paperclip_agent_instructions>\n\n` +
+    `The instructions above are your managed Paperclip operating contract, loaded from ${rootDir}${path.sep}. ` +
+    `Follow them on every run: run the HEARTBEAT checklist, fetch and check out your assigned issue(s) via the Paperclip API, ` +
+    `do the work, and end the run by updating the issue to a clear final disposition (done, in_review, blocked, or delegated) — ` +
+    `never stop without recording a next step. Resolve any relative file references from ${rootDir}${path.sep}.`;
+
+  await onLog(
+    "stdout",
+    `[paperclip] Loaded agent instructions bundle (${loadedFiles.join(", ")}) from ${rootDir}\n`,
+  );
+  notes.push(`Loaded instructions bundle: ${loadedFiles.join(", ")} (${totalBytes} bytes).`);
+
+  return {
+    prompt: preamble,
+    addDir: rootDir,
+    notes,
+    chars: preamble.length,
+    loadedFiles,
+  };
+}
+
 interface CopilotRuntimeConfig {
   command: string;
   cwd: string;
@@ -247,10 +390,16 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
   };
   const renderedPrompt = renderTemplate(promptTemplate, templateData);
   const sessionHandoffNote = asString(context.paperclipSessionHandoffMarkdown, "").trim();
-  const prompt = joinPromptSections([sessionHandoffNote, renderedPrompt]);
+  const instructionsBundle = await loadCopilotInstructionsBundle(config, onLog);
+  const prompt = joinPromptSections([
+    instructionsBundle.prompt,
+    sessionHandoffNote,
+    renderedPrompt,
+  ]);
 
   const buildCopilotArgs = (resumeSessionId: string | null) => {
     const args = ["-p", prompt, "--output-format", "json", "-s", "--no-color"];
+    if (instructionsBundle.addDir) args.push("--add-dir", instructionsBundle.addDir);
     if (resumeSessionId) args.push(`--resume=${resumeSessionId}`);
     if (dangerouslySkipPermissions) args.push("--allow-all");
     else args.push("--allow-all-tools");
@@ -275,6 +424,11 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
           // Surface auth provenance for diagnostics — never the secret itself.
           copilotTokenSource: tokenSource,
           copilotProviderBaseUrl: providerBaseUrl,
+          // Surface instructions-bundle provenance for diagnostics.
+          copilotInstructionsChars: instructionsBundle.chars,
+          copilotInstructionsFiles: instructionsBundle.loadedFiles,
+          copilotInstructionsAddDir: instructionsBundle.addDir || null,
+          copilotInstructionsNotes: instructionsBundle.notes,
         },
       });
     }
