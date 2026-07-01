@@ -255,8 +255,9 @@ async function buildCopilotRuntimeConfig(input: {
   agent: AdapterExecutionContext["agent"];
   config: Record<string, unknown>;
   context: Record<string, unknown>;
+  authToken?: string;
 }): Promise<CopilotRuntimeConfig> {
-  const { runId, agent, config, context } = input;
+  const { runId, agent, config, context, authToken } = input;
 
   const command = asString(config.command, "copilot");
   const workspaceContext = parseObject(context.paperclipWorkspace);
@@ -271,6 +272,17 @@ async function buildCopilotRuntimeConfig(input: {
 
   for (const [key, value] of Object.entries(envConfig)) {
     if (typeof value === "string") env[key] = value;
+  }
+
+  // Local agent JWT: Paperclip mints a per-run token in `ctx.authToken` when the
+  // adapter declares `supportsLocalAgentJwt: true`. Expose it as PAPERCLIP_API_KEY
+  // (unless explicitly set via config.env) so the agent can authenticate its
+  // Paperclip API calls — checkout, comments, and the final issue disposition.
+  if (
+    !(typeof env.PAPERCLIP_API_KEY === "string" && env.PAPERCLIP_API_KEY.trim().length > 0) &&
+    authToken
+  ) {
+    env.PAPERCLIP_API_KEY = authToken;
   }
 
   // Provider BYOK takes precedence: when COPILOT_PROVIDER_BASE_URL is set
@@ -336,7 +348,7 @@ async function buildCopilotRuntimeConfig(input: {
 }
 
 export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExecutionResult> {
-  const { runId, agent, runtime, config, context, onLog, onMeta, onSpawn } = ctx;
+  const { runId, agent, runtime, config, context, onLog, onMeta, onSpawn, authToken } = ctx;
 
   const promptTemplate = asString(
     config.promptTemplate,
@@ -351,6 +363,7 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
     agent,
     config,
     context,
+    authToken,
   });
   const { command, cwd, env, timeoutSec, graceSec, extraArgs, tokenSource, providerBaseUrl } = runtimeConfig;
 
